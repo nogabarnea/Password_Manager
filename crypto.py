@@ -27,7 +27,7 @@ def decrypt(encrypted_text):
         decrypted_value = ord(encrypted_char) ^ ord(key_char) # XOR שוב - אותו דבר
         decrypted += chr(decrypted_value)
     return decrypted
-   
+
 
 ##########################################
 def string_to_base64(text):

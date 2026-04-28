@@ -78,7 +78,7 @@ async function generatePassword() {
 }
 
 /**
- * 
+ *
  * @param {Array} passwords // array of object in the form of json {id, service, username, password}
  */
 function displayPasswords(passwords) {
@@ -90,13 +90,13 @@ function displayPasswords(passwords) {
     }
         passwords.forEach(function(entry) {
         let itemHTML = createPasswordItemHTML(entry); // only building HTML here
-        listContainer.innerHTML += itemHTML; 
+        listContainer.innerHTML += itemHTML;
     });
         addPasswordItemListeners();
 }
 
 /**
- * @param {Object} entry 
+ * @param {Object} entry
  * @returns {string}
  */
 function createPasswordItemHTML(entry) {
@@ -122,7 +122,7 @@ function addPasswordItemListeners() { //show/hide password buttons and delete bu
             let item = this.closest(".password-item"); //get the div the button is in
             let passwordInput = item.querySelector(".password-display"); //get the input field inside that div
             if (passwordInput.type === "password") {
-                //Get password (from the dots) and undot it
+                //Get password and remove the dots and change to password
                 let encrypted = item.dataset.encrypted;
                 try {
                     const response = await fetch("/api/decrypt", { // decrypt password
@@ -191,7 +191,7 @@ async function clearAll() {
 
 /**
  *
- * @param {string} text 
+ * @param {string} text
  * @returns {string}
  */
 function escapeHTML(text) { // defense againt XSS

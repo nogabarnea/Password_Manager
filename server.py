@@ -2,10 +2,12 @@ import http.server
 import socketserver
 import json
 import os
-import sqlite3  # for the users database
+import sqlite3
 import hashlib
 import base64
 import secrets  # for cryptographically secure random salt generation
+import threading
+import time
 from urllib.parse import parse_qs, urlparse
 from crypto import encrypt, decrypt, generate_password
 
@@ -59,12 +61,35 @@ def save_passwords(passwords):
         json.dump(passwords, f, indent=2)
 
 
-class PasswordManager(http.server.SimpleHTTPRequestHandler):    
+class PasswordStore: # reading and writing to json file, used by PasswordManager to store passwords, not users
+
+    def __init__(self, filename):
+        self.filename = filename 
+
+    def load(self):
+        if not os.path.exists(self.filename):
+            return []
+        try:
+            with open(self.filename, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+
+    def save(self, passwords):
+        with open(self.filename, 'w') as f:
+            json.dump(passwords, f, indent=2)
+
+
+# One shared instance used by PasswordManager for all file operations
+store = PasswordStore(DATA_FILE)
+
+
+class PasswordManager(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         #get all passwords ,filtered by user_id if provided from query
         if parsed.path == '/api/passwords':
-            passwords = load_passwords()
+            passwords = store.load()
             query = parse_qs(parsed.query)
             user_id = query.get('user_id', [None])[0]
             if user_id:
@@ -77,8 +102,8 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
             self.send_json_response({"password": password})
             return
         super().do_GET()
-    
-    
+
+
     def do_POST(self):
         parsed = urlparse(self.path) #resolve path
         content_length = int(self.headers.get('Content-Length', 0))
@@ -86,8 +111,8 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
         try:
             if post_data:
                 data = json.loads(post_data)
-            else:   
-                data = {}    
+            else:
+                data = {}
         except:
             data = {}
 
@@ -108,25 +133,25 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
             row = cursor.fetchone()
             conn.close()
             if row:
-                # user found, now verify password using stored salt
+                #user found check pass
                 stored_user_id = row[0]
                 stored_username = row[1]
                 stored_hash = row[2]
                 stored_salt = row[3]
-                # hash provided password with the SAME salt used at signup
+                #hash provided password with the same salt used at signup
                 provided_hash, _ = hash_password(password, stored_salt)
                 if provided_hash == stored_hash:
-                    # Passwords match, login successful
+                    #passwords match - login
                     self.send_json_response({"success": True, "user_id": stored_user_id, "username": stored_username})
                 else:
-                    # Password doesn't match
+                    #password not correct
                     self.send_json_response({"error": "Wrong username or password"}, 401)
             else:
-                # User not found
+                #user not found
                 self.send_json_response({"error": "Wrong username or password"}, 401)
             return
 
-        # signup - create new user in SQLite
+        #signup, create new user in SQL
         if parsed.path == '/api/signup':
             username = data.get('username', '').strip()
             password = data.get('password', '')
@@ -161,8 +186,8 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
             user_id = data.get('user_id', None)  # who this password belongs to
             if not service or not username or not password: #check if every data is there
                 self.send_json_response({"error": "Missing fields"}, 400)
-                return     
-            encrypted = encrypt(password)        
+                return
+            encrypted = encrypt(password)
             import time
             entry = {
                 "id": int(time.time() * 1000), # id of pass is time * 1000
@@ -171,13 +196,13 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
                 "username": username,
                 "password": encrypted,
                 "createdAt": time.strftime("%m/%d/%Y") #date created
-            }   
-            passwords = load_passwords()
+            }
+            passwords = store.load()
             passwords.append(entry)
-            save_passwords(passwords)
+            store.save(passwords)
             self.send_json_response({"success": True, "entry": entry})
             return
-        
+
         if parsed.path == '/api/decrypt': # if I want to show password
             encrypted = data.get('encrypted', '')
             if encrypted:
@@ -187,28 +212,28 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
                 self.send_json_response({"error": "No data"}, 400) #has to be decrypted, return error
             return
         self.send_json_response({"error": "Not found"}, 404)
-    
+
     def do_DELETE(self):
         parsed = urlparse(self.path) #resolve path
         if parsed.path.startswith('/api/passwords/'):
             try:
                 entry_id = int(parsed.path.split('/')[-1])
-                passwords = load_passwords()
+                passwords = store.load()
                 passwords = [p for p in passwords if p['id'] != entry_id] # load evrything but the deleted one
-                save_passwords(passwords)
+                store.save(passwords)
                 self.send_json_response({"success": True})
             except:
                 self.send_json_response({"error": "Invalid ID"}, 400)
             return
         if parsed.path.startswith('/api/all/passwords/'): #clear all paaword by user
-            passwords = load_passwords()
+            passwords = store.load()
             user_id = parsed.path.split('/')[-1]
             passwords = [p for p in passwords if p['user_id'] != user_id] # load evrything but deleted ones
-            save_passwords(passwords)
+            store.save(passwords)
             self.send_json_response({"success": True})
             return
         self.send_json_response({"error": "Not found"}, 404)
-    
+
     #############################
     def send_json_response(self, data, status=200):
         self.send_response(status)
@@ -219,12 +244,22 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
     ###############################
 
 
+def _auto_backup():
+    import shutil
+    while True:
+        time.sleep(60)
+        if os.path.exists(DATA_FILE):
+            shutil.copy2(DATA_FILE, DATA_FILE + ".bak")
+
+
 #open TCP server - socket server - alawys on
 def main():
     init_db()
+    backup_thread = threading.Thread(target=_auto_backup, daemon=True)
+    backup_thread.start()
     print(f"Starting server at http://{HOST}:{PORT}")
     print()
-    with socketserver.TCPServer((HOST, PORT), PasswordManager) as httpd:
+    with socketserver.ThreadingTCPServer((HOST, PORT), PasswordManager) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

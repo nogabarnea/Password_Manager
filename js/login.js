@@ -58,16 +58,16 @@ function init(config) {
         }, 1000);
     }
 
-    // keep the lockdown and countdown even if page is refreshed
+    //keep the lockdown and countdown even if page is refreshed
     if (getLockoutSecondsLeft() > 0) {
         disableForm();
         startCountdown();
     }
-    // if get here from sing-up
+    //if get here from sing-up
     document.getElementById("login-form").addEventListener("submit", async function(e) {
         e.preventDefault();
 
-        if (getLockoutSecondsLeft() > 0) return; // just in case
+        if (getLockoutSecondsLeft() > 0) return; // in case of an edge case where they click submit right as the lockout finishes, this will prevent an extra attempt from being counted or a login attempt from being made when they shouldn't be allowed to
 
         ///////////// begin login, above is just preperation
         let username = document.getElementById("username").value.trim();
@@ -88,7 +88,7 @@ function init(config) {
             const result = await response.json();
 
             if (result.success) {
-                // worked, clean up any old attempt data before moving on
+                // logged in, clean up any old attempt data before moving on
                 localStorage.removeItem(ATTEMPTS_KEY);
                 localStorage.removeItem(LOCKOUT_KEY);
                 sessionStorage.setItem("user_id", result.user_id);
@@ -96,7 +96,7 @@ function init(config) {
                 alert("Logged in successfully!");
                 window.location.href = "index.html";
             } else {
-                // wrong password, increase the fail count, maybe start a lockout
+                // wrong password, add to the fail count, maybe start a lockout
                 let attempts = parseInt(localStorage.getItem(ATTEMPTS_KEY) || "0") + 1;
                 localStorage.setItem(ATTEMPTS_KEY, attempts);
 
