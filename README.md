@@ -1,83 +1,57 @@
 # Password Manager
 
-**Password Manager** is a small, self‑hosted password manager built with plain Python and basic web pages. You can sign up, save passwords for different services, and pull them back when you need them. It’s meant for learning and personal tinkering—not production use.
+A self-hosted password manager built as my final cyber major project (12th grade).
+Full-stack web application with a Python backend, SQLite database,
+and a vanilla JS/HTML/CSS frontend.
 
----
+## Features
 
-## 🚀 What it does
+- **User accounts** – signup & login flow with SQLite-backed user storage
+- **Password vault** – store, view, and delete service/username/password entries
+- **Random password generator** – customizable strong password creation
+- **Web UI** – served from a custom Python HTTP server on `127.0.0.1:8083`
+- **Modular architecture** – server logic, crypto helpers, and frontend separated
 
-- Lets people sign up and log in (simple SQLite database)
-- Stores service/username/password entries
-- Encrypts passwords with a basic XOR cipher (just for fun)
-- Can generate a random password for you
-- Lets you view or delete each entry, or wipe everything
-- Runs on a lightweight Python HTTP server
-- Uses vanilla HTML/CSS/JS on the frontend
+## Architecture
 
-## 🛠️ Tech overview
+Frontend (HTML/CSS/JS)
+        │  fetch / JSON
+        ▼
+Python HTTP Server (server.py)
+        │
+        ├──→ crypto.py    (encryption + password generation)
+        ├──→ users.db     (SQLite – accounts)
+        └──→ passwords_data.json  (vault storage)
 
-- **Backend:** Python 3 (`server.py` + `crypto.py`)
-- **Frontend:** Static HTML (`index.html`, `signup.html`, `login.html`), CSS, and JavaScript (`js/app.js`)
-- **Storage:**
-  - `users.db` (SQLite) for accounts
-  - `passwords_data.json` for the saved passwords
+## Tech Stack
 
-## 📁 Layout
+- **Backend:** Python 3 (standard library only – no external deps)
+- **Frontend:** Vanilla HTML, CSS, JavaScript (no frameworks)
+- **Storage:** SQLite (accounts) + JSON (vault)
+- **Architecture:** Layered – HTTP layer, crypto layer, persistence layer
 
-```
-Cyber-main/
-├── crypto.py              # encryption helpers & password generator
-├── server.py              # server logic
-├── index.html             # main UI
-├── signup.html            # registration page
-├── login.html             # login page
-├── css/style.css          # styling
-├── js/app.js              # frontend logic
-├── passwords_data.json    # holds the passwords (created at runtime)
-├── users.db               # SQLite database (created at runtime)
-└── ...
-```
+## Running it
+bash
+git clone https://github.com/nogabarnea/password-manager.git
+cd password-manager
+python server.py
+Then open `http://127.0.0.1:8083` in your browser.
 
-## ⚙️ Getting started
+## What I learned
+- Building an HTTP server from scratch with Python's `http.server` module
+- Designing a small but real database schema for user accounts
+- Separating concerns between frontend, backend, and persistence layers
+- Implementing a complete signup → login → authenticated-action flow
+- Why password storage is *hard* – this project taught me the difference between
+  obfuscation and real cryptography, and what production systems actually need
+  (bcrypt, Argon2, proper key management, parameterized queries, HTTPS)
 
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/YourUsername/Cyber.git
-   cd Cyber
-   ```
+## Roadmap
+- Replace XOR obfuscation with `cryptography` library (Fernet / AES-GCM)
+- Replace JSON vault with encrypted SQLite blobs
+- Hash master passwords with bcrypt instead of plaintext compare
+- Add HTTPS / TLS
+- Token-based session auth instead of plain user_id
 
-2. Make sure you have Python 3 installed.
-
-3. Start the server:
-   ```bash
-   python server.py
-   ```
-   It runs on `http://127.0.0.1:8083` by default.
-
-4. Point your browser there and use the app:
-   - Sign up (`signup.html`), then log in (`login.html`).
-   - The main page lets you add, view, or delete passwords.
-
-## 🔒 A few warnings
-
-- The “encryption” is a simple XOR with a hard‑coded key. Don’t rely on it.
-- Passwords are kept in a plain JSON file, so anyone with access can read them.
-- There’s no real auth on the API; it’s just `user_id` in the request.
-
-Use this project as a learning tool, not as a secure product.
-
-## 📦 Requirements
-
-Nothing extra – it uses only the Python standard library.
-
-## 👥 Want to help?
-
-Fork it, raise issues, or send PRs. Improvements to security, features, and UI are all welcome.
-
-## 📄 License
-
-MIT (you can add a `LICENSE` file if you like).
-
----
-
-*Made by the Cyber project team.*
+## License
+MIT
