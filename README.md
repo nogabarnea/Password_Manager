@@ -14,7 +14,6 @@ and a vanilla JS/HTML/CSS frontend.
 
 ## Architecture
 
-```
 Frontend (HTML/CSS/JS)
         │  fetch / JSON
         ▼
@@ -23,7 +22,6 @@ Python HTTP Server (server.py)
         ├──→ crypto.py    (encryption + password generation)
         ├──→ users.db     (SQLite – accounts)
         └──→ passwords_data.json  (vault storage)
-```
 
 ## Tech Stack
 
@@ -33,16 +31,13 @@ Python HTTP Server (server.py)
 - **Architecture:** Layered – HTTP layer, crypto layer, persistence layer
 
 ## Running it
-
-```bash
+bash
 git clone https://github.com/nogabarnea/password-manager.git
 cd password-manager
 python server.py
-```
 Then open `http://127.0.0.1:8083` in your browser.
 
 ## What I learned
-
 - Building an HTTP server from scratch with Python's `http.server` module
 - Designing a small but real database schema for user accounts
 - Separating concerns between frontend, backend, and persistence layers
@@ -50,6 +45,13 @@ Then open `http://127.0.0.1:8083` in your browser.
 - Why password storage is *hard* – this project taught me the difference between
   obfuscation and real cryptography, and what production systems actually need
   (bcrypt, Argon2, proper key management, parameterized queries, HTTPS)
+
+## Roadmap
+- Replace XOR obfuscation with `cryptography` library (Fernet / AES-GCM)
+- Replace JSON vault with encrypted SQLite blobs
+- Hash master passwords with bcrypt instead of plaintext compare
+- Add HTTPS / TLS
+- Token-based session auth instead of plain user_id
 
 ## License
 MIT
