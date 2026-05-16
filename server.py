@@ -5,14 +5,14 @@ import os
 import sqlite3
 import hashlib
 import base64
-import secrets  # for cryptographically secure random salt generation
+import secrets  # salt
 import threading
 import time
 import ssl
 from urllib.parse import parse_qs, urlparse
 from crypto import encrypt, decrypt, generate_password
 
-PORT = 8082
+PORT = 8083
 HOST = "127.0.0.1"
 DATA_FILE = "passwords_data.json"
 DB_FILE = "users.db"
@@ -65,7 +65,8 @@ def save_passwords(passwords):
 class PasswordStore: # reading and writing to json file, used by PasswordManager to store passwords, not users
 
     def __init__(self, filename):
-        self.filename = filename 
+        self.filename = filename
+        self._lock = threading.Lock()
 
     def load(self):
         if not os.path.exists(self.filename):
@@ -80,6 +81,17 @@ class PasswordStore: # reading and writing to json file, used by PasswordManager
         with open(self.filename, 'w') as f:
             json.dump(passwords, f, indent=2)
 
+    def add(self, entry):
+        with self._lock:
+            passwords = self.load()
+            passwords.append(entry)
+            self.save(passwords)
+
+    def remove(self, predicate):
+        with self._lock:
+            passwords = self.load()
+            self.save([p for p in passwords if not predicate(p)])
+
 
 # One shared instance used by PasswordManager for all file operations
 store = PasswordStore(DATA_FILE)
@@ -90,9 +102,9 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         #get all passwords ,filtered by user_id if provided from query
         if parsed.path == '/api/passwords':
-            passwords = store.load()
-            query = parse_qs(parsed.query)
-            user_id = query.get('user_id', [None])[0]
+            passwords = store.load() #brings all passwords from json
+            query = parse_qs(parsed.query) #makes dict of query params (user id and its value)
+            user_id = query.get('user_id', [None])[0] # get user_id from query, if not there use None
             if user_id:
                 passwords = [p for p in passwords if str(p.get('user_id')) == str(user_id)]
             self.send_json_response(passwords)
@@ -198,9 +210,7 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
                 "password": encrypted,
                 "createdAt": time.strftime("%m/%d/%Y") #date created
             }
-            passwords = store.load()
-            passwords.append(entry)
-            store.save(passwords)
+            store.add(entry)
             self.send_json_response({"success": True, "entry": entry})
             return
 
@@ -218,19 +228,15 @@ class PasswordManager(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path) #resolve path
         if parsed.path.startswith('/api/passwords/'):
             try:
-                entry_id = int(parsed.path.split('/')[-1])
-                passwords = store.load()
-                passwords = [p for p in passwords if p['id'] != entry_id] # load evrything but the deleted one
-                store.save(passwords)
+                entry_id = int(parsed.path.split('/')[-1]) #extract id from path
+                store.remove(lambda p: p['id'] == entry_id)
                 self.send_json_response({"success": True})
             except:
                 self.send_json_response({"error": "Invalid ID"}, 400)
             return
         if parsed.path.startswith('/api/all/passwords/'): #clear all paaword by user
-            passwords = store.load()
-            user_id = parsed.path.split('/')[-1]
-            passwords = [p for p in passwords if p['user_id'] != user_id] # load evrything but deleted ones
-            store.save(passwords)
+            user_id = parsed.path.split('/')[-1] #extract id from path
+            store.remove(lambda p: p['user_id'] == user_id)
             self.send_json_response({"success": True})
             return
         self.send_json_response({"error": "Not found"}, 404)
@@ -258,20 +264,11 @@ def main():
     backup_thread = threading.Thread(target=_auto_backup, daemon=True)
     backup_thread.start()
 
-    #create a TLS context — tells Python "we are a SERVER, use the best TLS version available"
+    #create a TLS context. tells Python "we are a SERVER, use the best TLS version available"
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
 
     #load the certificate and private key
-    #Both files were generated using the OpenSSL command:
-    #openssl req -new -x509 -days 365 -nodes -out cert.pem -keyout key.pem
-    #
-    #cert.pem = the PUBLIC certificate — sent to every browser that connects,
-    #            like a digital ID card that proves this is our server.
-    #            It is self-signed, which is why browsers show a security warning.
-    #
-    #key.pem  = the PRIVATE key — never leaves the server.
-    #            Used to decrypt messages that were encrypted using cert.pem.
-    #            If someone stole only cert.pem they still could not decrypt anything.
+    #Both files were generated using the OpenSSL command
     context.load_cert_chain(certfile='cert.pem', keyfile='key.pem')
 
     # Stepstart a plain TCP server, then upgrade its socket to TLS

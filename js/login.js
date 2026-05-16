@@ -37,11 +37,11 @@ function init(config) {
     }
 
     function startCountdown() {
-        let box     = document.getElementById("lockout-box");
+        let box = document.getElementById("lockout-box");
         let counter = document.getElementById("lockout-counter");
         box.style.display = "block";
 
-        // set the number right away so it doesn't show "--" for the first second
+        // Put in the HTML how many seconds are lft for iyt to be updated later
         counter.textContent = getLockoutSecondsLeft();
 
         let interval = setInterval(function() {
